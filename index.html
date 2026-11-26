@@ -115,7 +115,10 @@
       return {code, name, n};
     }).sort((a,b)=>a.name.localeCompare(b.name,'id'));
     let selected = [];
-    try { selected = (localStorage.getItem('tvradio_country') || '').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean); } catch {}
+    try {
+      const stored = localStorage.getItem('tvradio_country');
+      selected = stored === null ? ['ID'] : stored.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+    } catch { selected = ['ID']; }
 
     function renderList() {
       const q = (search.value || '').toLowerCase().trim();

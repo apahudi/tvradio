@@ -6,7 +6,7 @@
   <title>Radio Indonesia | TVRadioID</title>
   <meta name="description" content="Dengarkan stasiun radio streaming dari seluruh Indonesia di TVRadioID." />
   <meta name="theme-color" content="#0f172a" />
-  <link rel="stylesheet" href="style.css?v=31" />
+  <link rel="stylesheet" href="style.css?v=35" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -60,19 +60,41 @@
             <select class="category-select" id="filter-tabs" aria-label="Filter kategori">
         <option value="all" selected>Semua</option>
         <option value="favorit">★ Favorit</option>
-        <option value="nasional">Indonesia</option>
+        <optgroup label="Genre">
+          <option value="genre:pop">Pop</option>
+          <option value="genre:rock">Rock</option>
+          <option value="genre:jazz">Jazz</option>
+          <option value="genre:news">Berita/News</option>
+          <option value="genre:religious">Religi</option>
+          <option value="genre:classical">Klasik</option>
+          <option value="genre:dance">Dance/Electronic</option>
+          <option value="genre:oldies">Oldies</option>
+          <option value="genre:hiphop">HipHop</option>
+          <option value="genre:chill">Chill/LoFi</option>
+          <option value="genre:talk">Talk</option>
+          <option value="genre:sports">Olahraga</option>
+          <option value="genre:other">Lainnya</option>
+        </optgroup>
+        <optgroup label="Indonesia">
+          <option value="nasional">Nasional</option>
+          <option value="jabodetabek">Jabodetabek</option>
+          <option value="jawa">Jawa</option>
+          <option value="sumatera">Sumatera</option>
+          <option value="kalimantan">Kalimantan</option>
+          <option value="sulawesi">Sulawesi</option>
+          <option value="bali-nusa">Bali & Nusa</option>
+          <option value="maluku">Maluku</option>
+          <option value="papua">Papua</option>
+        </optgroup>
         <option value="internasional">Internasional</option>
-        <option value="jabodetabek">Jabodetabek</option>
-        <option value="jawa">Jawa</option>
-        <option value="sumatera">Sumatera</option>
-        <option value="kalimantan">Kalimantan</option>
-        <option value="sulawesi">Sulawesi</option>
-        <option value="bali-nusa">Bali & Nusa</option>
-        <option value="maluku">Maluku</option>
-        <option value="papua">Papua</option>
             </select>
           </label>
-
+        <label class="theme-toggle" title="Filter negara radio">
+          Negara
+          <select id="radio-country" aria-label="Filter negara radio">
+            <option value="">Semua negara</option>
+          </select>
+        </label>
           <button type="button" class="country-clear" id="country-clear" hidden></button>
           <span class="count" id="station-count" aria-live="polite"></span>
         </div>
@@ -125,6 +147,11 @@
         <div class="video-nav">
           <button type="button" class="video-nav-btn" id="video-prev" aria-label="Kanal sebelumnya">‹ Prev Channel</button>
           <button type="button" class="video-nav-btn" id="video-next" aria-label="Kanal berikutnya">Next Channel ›</button>
+          <button type="button" class="video-nav-btn" id="video-cc" aria-label="Subtitle" aria-pressed="false">CC</button>
+          <select id="video-cc-track" class="video-cc-select" aria-label="Pilih subtitle" hidden></select>
+          <select id="video-quality" class="video-cc-select" aria-label="Pilih kualitas video" title="Kualitas video">
+            <option value="auto">Auto</option>
+          </select>
           <button class="fp-close" id="video-close" aria-label="Tutup pemutar video">✕</button>
         </div>
       </div>
@@ -170,6 +197,6 @@
 
   <script src="hls.min.js?v=1"></script>
   <script src="stations-data.js?v=8"></script>
-  <script src="script.js?v=35"></script>
+  <script src="script.js?v=39"></script>
 </body>
 </html>

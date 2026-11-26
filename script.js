@@ -68,6 +68,7 @@
   const cacheSizeSelect = document.getElementById('cache-size');
   const scanBtn = document.getElementById('scan-btn');
   const countryClear = document.getElementById('country-clear');
+  const radioCountry = document.getElementById('radio-country');
   const themeSelect = document.getElementById('theme-select');
   const settingsFab = document.getElementById('settings-fab');
   const settingsPanel = document.getElementById('settings-panel');
@@ -105,6 +106,9 @@
   const videoBackdrop = document.getElementById('video-backdrop');
   const videoPrev = document.getElementById('video-prev');
   const videoNext = document.getElementById('video-next');
+  const videoCc = document.getElementById('video-cc');
+  const videoCcTrack = document.getElementById('video-cc-track');
+  const videoQuality = document.getElementById('video-quality');
   const scanProgress = document.getElementById('scan-progress');
   const scanProgressFill = document.getElementById('scan-progress-fill');
   const scanProgressText = document.getElementById('scan-progress-text');
@@ -116,6 +120,11 @@
   let hls = null;
   let videoHls = null;
   let videoStation = null;
+  const CC_KEY = 'tvradio_cc';
+  let ccEnabled = (localStorage.getItem(CC_KEY) || 'en') !== 'off';
+  let ccTrackId = localStorage.getItem(CC_KEY) || 'en';
+  const QUALITY_KEY = 'tvradio_quality';
+  let qualityPref = localStorage.getItem(QUALITY_KEY) || 'auto';
   let pageFilter = isTv ? 'nasional' : 'all';
   let searchQuery = '';
   let provinceFilter = '';
@@ -156,6 +165,31 @@
   let scanQueue = [];
   let scanIndex = 0;
   let scanTimer = null;
+  let scanFailSafeTimer = null;
+  function clearScanFailSafe() { if (scanFailSafeTimer) { clearTimeout(scanFailSafeTimer); scanFailSafeTimer = null; } }
+  function markScanBad(station, reason) {
+    if (!station) return;
+    setBufferStat(station.id, 10000);
+    try { markOffline(station, reason || 'Scan gagal'); } catch {}
+    try { excludeStation(station, reason || 'Scan gagal'); } catch {}
+  }
+  function armScanFailSafe(station) {
+    clearScanFailSafe();
+    if (!scanning || !station) return;
+    const id = station.id;
+    scanFailSafeTimer = setTimeout(() => {
+      scanFailSafeTimer = null;
+      if (!scanning) return;
+      const cur = isTv ? videoStation : currentStation;
+      if (!cur || cur.id !== id) return;
+      if (isTv && videoPlayer && !videoPlayer.paused && videoPlayer.readyState >= 2) return;
+      if (!isTv && audio && !audio.paused && audio.readyState >= 2) return;
+      markScanBad(cur, 'Scan timeout 10s');
+      if (isTv) { if (videoStatus) videoStatus.textContent = 'Scan: gagal/timeout, lanjut…'; }
+      else { if (fpStatus) fpStatus.textContent = 'Scan: gagal/timeout, lanjut…'; }
+      advanceScan();
+    }, 10000);
+  }
   let scanInternalPlay = false;
   let scanAdvanceLock = 0;
   let scanModeTimer = null;
@@ -534,9 +568,35 @@
       .some((v) => String(v).toLowerCase().includes(needle));
   }
 
+  function radioGenre(s) {
+    const name = String(s.name || '').toLower();
+    const tags = Array.isArray(s.tags) ? s.tags.join(' ').toLowerCase() : String(s.tags || '').toLowerCase();
+    const hay = name + ' ' + tags + ' ' + String(s.genre||'').toLowerCase();
+    const map = [
+      ['religious', /relig|islam|quran|qur'an|gospel|church|bible|christ|hindu|buddha/],
+      ['news', /news|berita|talk news|informasi/],
+      ['talk', /talk|podcast|wawancara|diskusi/],
+      ['sports', /sport|bola|football|soccer/],
+      ['jazz', /jazz|smooth jazz/],
+      ['classical', /classic|klasik|symphony|orchestra|baroque/],
+      ['rock', /rock|metal|punk|alternative/],
+      ['hiphop', /hip ?hop|rap|r&b|rnb/],
+      ['dance', /dance|edm|electro|house|trance|techno|club/],
+      ['chill', /chill|lofi|lo-fi|ambient|relax|easy/],
+      ['oldies', /oldies|80s|90s|70s|60s|retro|nostalgia/],
+      ['pop', /pop|hits|top 40|chart/],
+    ];
+    for (const [g, re] of map) if (re.test(hay)) return g;
+    return 'other';
+  }
   function matchesFilter(s, filter) {
     if (filter === 'all') return true;
     if (filter === 'favorit') return isFavorite(s.id);
+    if (filter.startsWith('genre:')) {
+      if (s.type !== 'radio') return false;
+      return radioGenre(s) === filter.slice(6);
+    }
+    if (filter === 'internasional') return s.type === 'radio' && (s.category === 'internasional' || (String(s.country||'').toUpperCase() !== 'ID' && s.country));
     return s.category === filter;
   }
 
@@ -578,8 +638,9 @@
   }
 
   function visibleStation(s) {
+    const lvl = bufferLevel(bufferStats[s.id]);
     return s.type === page &&
-      !(hideOffline && (statusOf(s) === 'offline' || isGeoBlocked(s) || isExcluded(s))) &&
+      !(hideOffline && (statusOf(s) === 'offline' || isGeoBlocked(s) || isExcluded(s) || lvl === 'red' || lvl === 'yellow')) &&
       (!countryFilters.length || countryFilters.includes(String(s.country || '').toUpperCase())) &&
       (!provinceFilter || (s.province || 'Indonesia') === provinceFilter) &&
       matchesFilter(s, pageFilter) &&
@@ -1188,6 +1249,7 @@
   }
   function stopScan(msg) {
     scanning = false;
+    clearScanFailSafe();
     if (scanProgressFill) scanProgressFill.style.width = '100%';
     if (scanProgressText) scanProgressText.textContent = 'Scan selesai';
     scanModeTimer = setTimeout(() => { scanModeTimer = null; setScanMode(false); }, 800);
@@ -1200,8 +1262,9 @@
   function advanceScan() {
     if (!scanning) return;
     const now = Date.now();
-    if (now - scanAdvanceLock < 800) return;
+    if (now - scanAdvanceLock < 500) return;
     scanAdvanceLock = now;
+    clearScanFailSafe();
     scanIndex++;
     if (scanIndex >= scanQueue.length) {
       stopScan(`Scan selesai: ${scanQueue.length} kanal`);
@@ -1213,21 +1276,23 @@
     scanInternalPlay = true;
     playStation(st);
     scanInternalPlay = false;
+    armScanFailSafe(st);
   }
   function startScan() {
     if (scanning) { stopScan('Scan dihentikan'); return; }
-    const items = stations.filter(visibleStation);
-    if (!items.length) { toast('Tidak ada kanal untuk discan'); return; }
+    const items = stations.filter((s) => visibleStation(s) && bufferStats[s.id] === undefined);
+    if (!items.length) { toast('Semua kanal sudah pernah discan'); return; }
     scanning = true;
     scanQueue = items.slice();
     scanIndex = 0;
     if (scanBtn) { scanBtn.classList.add('busy'); scanBtn.textContent = `⏳ Scan 1/${scanQueue.length}`; }
-    toast(`Mulai scan ${scanQueue.length} kanal…`);
+    toast(`Mulai scan ${scanQueue.length} kanal (melewati yang sudah discan)…`);
     setScanMode(isTv);
     if (isTv) { renderScanList(); updateScanProgress(); }
     scanInternalPlay = true;
     playStation(scanQueue[0]);
     scanInternalPlay = false;
+    armScanFailSafe(scanQueue[0]);
   }
 
   function closeVideo() {
@@ -1237,6 +1302,8 @@
     videoStation = null;
     if (videoHls) { try { videoHls.destroy(); } catch { /* ignore */ } videoHls = null; }
     if (videoPlayer) { videoPlayer.pause(); videoPlayer.removeAttribute('src'); videoPlayer.load(); }
+    syncCcUi();
+    syncQualityUi();
     videoModal.hidden = true;
     document.body.classList.remove('video-open');
   }
@@ -1268,6 +1335,7 @@
     videoSub.textContent = regionOf(station);
     videoModal.hidden = false;
     setVideoStatus('Memuat stream…');
+    syncCcUi();
 
     loadAlternatives();
     if (!station.stream && (!Array.isArray(station.alternatives) || !station.alternatives.length)) {
@@ -1283,14 +1351,14 @@
   async function tryNextStream(station, index) {
     if (videoStation !== station) return;
     const candidates = streamCandidates(station);
+    if (scanning) armScanFailSafe(station);
     if (index >= candidates.length) {
       setVideoStatus('Semua stream gagal diputar. Kanal mungkin offline atau geo-blocked.');
-      markOffline(station, 'Semua alternatif gagal (geo-blocked/CORS).');
-      excludeStation(station, 'Semua alternatif gagal');
+      markScanBad(station, 'Semua alternatif gagal (geo-blocked/CORS).');
+      clearBufferWatchdog();
+      clearScanFailSafe();
       if (scanning) {
-        setBufferStat(station.id, 10000);
-        clearBufferWatchdog();
-        setTimeout(() => { if (scanning) advanceScan(); }, 350);
+        setTimeout(() => { if (scanning) advanceScan(); }, 250);
       }
       return;
     }
@@ -1300,10 +1368,18 @@
 
     if (!isHls || !window.Hls || !window.Hls.isSupported()) {
       videoPlayer.src = url;
+      videoPlayer.onloadedmetadata = () => { syncCcUi(); applyCc(); };
       videoPlayer.play().then(() => {
         setVideoStatus('Sedang ditonton');
         markOnline(station);
+        syncCcUi(); applyCc();
       }).catch((err) => {
+        if (scanning) {
+          markScanBad(station, 'Tidak bisa diputar');
+          clearBufferWatchdog(); clearScanFailSafe();
+          setTimeout(() => { if (scanning) advanceScan(); }, 250);
+          return;
+        }
         setVideoStatus('Klik tombol putar pada video.');
         videoPlayer.onerror = () => tryNextStream(station, index + 1);
       });
@@ -1311,6 +1387,145 @@
     }
 
     startHlsVideo(station, url, videoSession, index, candidates.length);
+  }
+
+  // --- Subtitle / CC (tahap 1: bawaan stream) ---
+  function ccTracks() {
+    if (videoHls && Array.isArray(videoHls.subtitleTracks) && videoHls.subtitleTracks.length) {
+      return videoHls.subtitleTracks.map((t, i) => ({ id: String(i), lang: (t.lang || '').toLowerCase(), label: t.name || t.lang || `Sub ${i + 1}`, hls: true, idx: i }));
+    }
+    const tt = videoPlayer ? Array.from(videoPlayer.textTracks || []) : [];
+    return tt.map((t, i) => ({ id: `tt:${i}`, lang: (t.language || '').toLowerCase(), label: t.label || t.language || `Sub ${i + 1}`, hls: false, idx: i, track: t }))
+      .filter(t => ['subtitles','captions'].includes((t.track && t.track.kind) || 'subtitles'));
+  }
+  function pickEnglishTrack(tracks) {
+    return tracks.find(t => t.lang === 'en' || t.lang.startsWith('en-') || /english/i.test(t.label))
+      || tracks.find(t => t.lang === 'eng')
+      || null;
+  }
+  // --- Kualitas video ---
+  function syncQualityUi() {
+    if (!videoQuality) return;
+    const levels = (videoHls && Array.isArray(videoHls.levels)) ? videoHls.levels : [];
+    videoQuality.innerHTML = '';
+    const auto = document.createElement('option'); auto.value = 'auto'; auto.textContent = 'Auto'; videoQuality.appendChild(auto);
+    levels.forEach((l, i) => {
+      const h = l.height || 0;
+      const label = h ? `${h}p` : (l.bitrate ? `${Math.round(l.bitrate/1000)}kbps` : `Level ${i+1}`);
+      const opt = document.createElement('option');
+      opt.value = String(i); opt.textContent = label; videoQuality.appendChild(opt);
+    });
+    const pref = qualityPref;
+    if (pref !== 'auto' && levels[Number(pref)]) videoQuality.value = pref; else videoQuality.value = 'auto';
+    videoQuality.disabled = levels.length === 0;
+  }
+  function applyQualityPref() {
+    if (!videoHls) return;
+    if (qualityPref === 'auto') {
+      videoHls.currentLevel = -1;
+      // keep 720p cap for auto
+      const levels = (videoHls.levels || []).map((l,i)=>({i,h:l.height||0}));
+      const cap = levels.filter(l=>l.h>0 && l.h<=720).pop();
+      videoHls.autoLevelCapping = cap ? cap.i : (levels.length ? levels.length-1 : -1);
+    } else {
+      const idx = Number(qualityPref);
+      if (!Number.isNaN(idx)) {
+        videoHls.autoLevelCapping = -1;
+        videoHls.currentLevel = idx;
+      }
+    }
+    syncQualityUi();
+  }
+
+  function syncCcUi() {
+    const tracks = ccTracks();
+    const has = tracks.length > 0;
+    if (videoCc) {
+      videoCc.disabled = !has;
+      videoCc.setAttribute('aria-pressed', String(ccEnabled && has));
+      videoCc.classList.toggle('active', ccEnabled && has);
+      videoCc.title = has ? (ccEnabled ? 'Matikan subtitle' : 'Aktifkan subtitle') : 'Subtitle tidak tersedia';
+    }
+    if (videoCcTrack) {
+      videoCcTrack.hidden = !has;
+      videoCcTrack.innerHTML = '';
+      if (has) {
+        const off = document.createElement('option');
+        off.value = 'off'; off.textContent = 'CC: Off';
+        videoCcTrack.appendChild(off);
+        tracks.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t.id; opt.textContent = t.label || t.lang || t.id;
+          videoCcTrack.appendChild(opt);
+        });
+        const current = currentCcTrackId(tracks);
+        videoCcTrack.value = (!ccEnabled || !current) ? 'off' : current;
+      }
+    }
+  }
+  function currentCcTrackId(tracks) {
+    if (videoHls && Array.isArray(videoHls.subtitleTracks) && videoHls.subtitleTracks.length) {
+      const idx = videoHls.subtitleTrack;
+      return (idx >= 0 && tracks[idx]) ? tracks[idx].id : null;
+    }
+    const showing = tracks.find(t => t.track && t.track.mode === 'showing');
+    return showing ? showing.id : null;
+  }
+  function applyCc(tracks) {
+    tracks = tracks || ccTracks();
+    if (!tracks.length) {
+      if (videoHls) { try { videoHls.subtitleTrack = -1; videoHls.subtitleDisplay = false; } catch {} }
+      syncCcUi();
+      return;
+    }
+    let target = null;
+    if (ccEnabled) {
+      target = tracks.find(t => t.id === ccTrackId) || pickEnglishTrack(tracks) || tracks[0];
+    }
+    if (videoHls && Array.isArray(videoHls.subtitleTracks) && videoHls.subtitleTracks.length) {
+      try {
+        videoHls.subtitleDisplay = !!target;
+        videoHls.subtitleTrack = target ? target.idx : -1;
+      } catch {}
+    } else if (videoPlayer) {
+      Array.from(videoPlayer.textTracks || []).forEach((t, i) => {
+        if (['subtitles','captions'].includes(t.kind)) t.mode = (target && target.idx === i) ? 'showing' : 'disabled';
+      });
+    }
+    if (target) { ccTrackId = target.id; }
+    try { localStorage.setItem(CC_KEY, ccEnabled ? (target ? target.lang || target.id : 'en') : 'off'); } catch {}
+    syncCcUi();
+  }
+  function setupCcListeners() {
+    if (videoCc) {
+      videoCc.addEventListener('click', () => {
+        const tracks = ccTracks();
+        if (!tracks.length) return;
+        ccEnabled = !ccEnabled;
+        if (ccEnabled && !pickEnglishTrack(tracks) && !tracks.find(t=>t.id===ccTrackId)) ccTrackId = tracks[0].id;
+        if (ccEnabled && ccTrackId === 'off') { const en = pickEnglishTrack(tracks); ccTrackId = en ? en.id : tracks[0].id; }
+        applyCc(tracks);
+      });
+    }
+    if (videoCcTrack) {
+      videoCcTrack.addEventListener('change', () => {
+        const val = videoCcTrack.value;
+        if (val === 'off') { ccEnabled = false; }
+        else { ccEnabled = true; ccTrackId = val; }
+        applyCc();
+      });
+    }
+    if (videoPlayer) {
+      videoPlayer.textTracks && videoPlayer.textTracks.addEventListener && videoPlayer.textTracks.addEventListener('addtrack', () => { syncCcUi(); applyCc(); });
+    }
+  }
+  setupCcListeners();
+  if (videoQuality) {
+    videoQuality.addEventListener('change', () => {
+      qualityPref = videoQuality.value || 'auto';
+      try { localStorage.setItem(QUALITY_KEY, qualityPref); } catch {}
+      applyQualityPref();
+    });
   }
 
   // Konfigurasi hls.js: cepat mulai, stabil saat jaringan jelek, max 720p.
@@ -1340,6 +1555,7 @@
       startFragPrefetch: true,
       testBandwidth: true,
       progressive: true,
+      enableWebVTT: true,
       appendErrorMaxRetry: 3,
       nudgeOffset: 0.1,
       nudgeMaxRetry: 5,
@@ -1369,17 +1585,20 @@
     videoHls.loadSource(url);
     videoHls.attachMedia(videoPlayer);
     let resolved = false;
+    videoHls.on(window.Hls.Events.SUBTITLE_TRACKS_UPDATED, () => { syncCcUi(); applyCc(); });
+    videoHls.on(window.Hls.Events.SUBTITLE_TRACK_LOADED, () => { syncCcUi(); });
+    videoHls.on(window.Hls.Events.LEVELS_UPDATED, () => { syncQualityUi(); applyQualityPref(); });
     videoHls.on(window.Hls.Events.MANIFEST_PARSED, () => {
       if (resolved) return;
       try {
-        const levels = (videoHls.levels || []).map((l, i) => ({ i, h: l.height || 0 }));
-        const cap = levels.filter((l) => l.h > 0 && l.h <= 720).pop();
-        if (cap) videoHls.autoLevelCapping = cap.i;
-        else if (levels.length) videoHls.autoLevelCapping = 0;
         videoHls.nextLoadLevel = 0;
         videoHls.startLoad(0);
       } catch { /* ignore */ }
       resolved = true;
+      syncQualityUi();
+      applyQualityPref();
+      syncCcUi();
+      applyCc();
       setVideoStatus('Sedang ditonton');
       markOnline(station);
       videoPlayer.play().catch(() => setVideoStatus('Klik tombol putar pada video.'));
@@ -1389,6 +1608,12 @@
       if (data && data.fatal) {
         resolved = true;
         try { if (prefetchAbort) prefetchAbort.abort(); } catch {}
+        if (scanning) {
+          markScanBad(station, 'HLS fatal error');
+          clearBufferWatchdog(); clearScanFailSafe();
+          setTimeout(() => { if (scanning) advanceScan(); }, 250);
+          return;
+        }
         tryNextStream(station, index + 1);
       }
     });
@@ -1402,6 +1627,12 @@
     videoPlayer.addEventListener('error', () => {
       if (resolved) return;
       resolved = true;
+      if (scanning) {
+        markScanBad(station, 'Video error');
+        clearBufferWatchdog(); clearScanFailSafe();
+        setTimeout(() => { if (scanning) advanceScan(); }, 250);
+        return;
+      }
       tryNextStream(station, index + 1);
     }, { once: true });
   }
@@ -1410,7 +1641,7 @@
     clearBufferWatchdog();
     bufferStartAt = Date.now();
     bufferStartStationId = station.id;
-    
+    armScanFailSafe(station);
     bufferWatchdog = setTimeout(() => {
       bufferWatchdog = null;
       if (!scanning || !currentStation || currentStation.id !== station.id) return;
@@ -1426,8 +1657,9 @@
     scanTimer = setTimeout(() => {
       scanTimer = null;
       if (!scanning || !currentStation || currentStation.id !== station.id) return;
-      setBufferStat(station.id, 10000);
-      setStatus('Scan: timeout 10s');
+      markScanBad(station, 'Scan timeout 10s');
+      setStatus('Scan: timeout 10s, lanjut…');
+      clearScanFailSafe();
       setTimeout(() => { if (scanning) advanceScan(); }, 250);
     }, 10000);
   }
@@ -1465,12 +1697,16 @@
       hls.on(window.Hls.Events.ERROR, (_, data) => {
         if (data && data.fatal) {
           setStatus('Gagal memutar stream.');
+          if (scanning) { markScanBad(station, 'Audio fatal error'); clearScanFailSafe(); setTimeout(() => { if (scanning) advanceScan(); }, 250); return; }
           markOffline(station, 'Gagal diputar di browser ini (bisa geo-blocked/CORS).');
         }
       });
     } else {
       a.src = url;
-      a.play().catch(() => setStatus('Tekan tombol putar untuk memulai.'));
+      a.play().catch(() => {
+        if (scanning) { markScanBad(station, 'Audio gagal diputar'); clearScanFailSafe(); setTimeout(() => { if (scanning) advanceScan(); }, 250); return; }
+        setStatus('Tekan tombol putar untuk memulai.');
+      });
     }
     if (scanning) armAudioScan(station);
     fpPlay.textContent = '⏸';
@@ -1545,12 +1781,10 @@
     videoPlayer.addEventListener('error', () => {
       if (!videoStation || !videoPlayer.getAttribute('src')) return;
       setVideoStatus('Gagal memuat stream. Kanal ditandai offline (bisa geo-blocked/CORS).');
-      markOffline(videoStation, 'Gagal diputar di browser ini (bisa geo-blocked/CORS).');
-      excludeStation(videoStation, 'Gagal diputar');
+      markScanBad(videoStation, 'Gagal diputar/geo-blocked');
+      clearBufferWatchdog(); clearScanFailSafe();
       if (scanning) {
-        setBufferStat(videoStation.id, 10000);
-        clearBufferWatchdog();
-        setTimeout(() => { if (scanning) advanceScan(); }, 350);
+        setTimeout(() => { if (scanning) advanceScan(); }, 250);
       }
     });
   }
@@ -1645,9 +1879,39 @@
       startScan();
     });
   }
+  function populateRadioCountries() {
+    if (!radioCountry || isTv) return;
+    const names = new Intl.DisplayNames(['id'], { type: 'region' });
+    const counts = new Map();
+    stations.filter(s => s.type === 'radio').forEach(s => {
+      const c = String(s.country || '').toUpperCase();
+      if (/^[A-Z]{2}$/.test(c)) counts.set(c, (counts.get(c)||0)+1);
+    });
+    const entries = Array.from(counts.entries()).map(([code,n]) => {
+      let name = code; try { name = names.of(code) || code; } catch {}
+      return {code,name,n};
+    }).sort((a,b)=>a.name.localeCompare(b.name,'id'));
+    radioCountry.innerHTML = '<option value="">Semua negara</option>';
+    entries.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.code; opt.textContent = `${e.name} (${e.n})`;
+      radioCountry.appendChild(opt);
+    });
+    if (countryFilters.length === 1) radioCountry.value = countryFilters[0];
+    else radioCountry.value = '';
+  }
+  if (radioCountry) {
+    radioCountry.addEventListener('change', () => {
+      const v = String(radioCountry.value || '').toUpperCase();
+      countryFilters = v ? [v] : [];
+      try { localStorage.setItem('tvradio_country', countryFilters.join(',')); } catch {}
+      render();
+    });
+  }
   if (countryClear) {
     countryClear.addEventListener('click', () => {
       countryFilters = [];
+      if (radioCountry) radioCountry.value = '';
       try { localStorage.setItem('tvradio_country', ''); } catch {}
       const url = new URL(location.href); url.searchParams.delete('country'); history.replaceState({}, '', url);
       render(); renderProvinsi();
@@ -1787,6 +2051,7 @@
   // --- Init ---
   render();
   renderProvinsi();
+  populateRadioCountries();
   loadAlternatives();
   applyView();
   updateInfoBar();

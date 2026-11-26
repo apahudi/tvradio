@@ -3,11 +3,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
 RADIO_FILTERS = [
-    ("all", "Semua"), ("favorit", "★ Favorit"), ("nasional", "Indonesia"), ("internasional", "Internasional"),
-    ("jabodetabek", "Jabodetabek"), ("jawa", "Jawa"),
-    ("sumatera", "Sumatera"), ("kalimantan", "Kalimantan"),
-    ("sulawesi", "Sulawesi"), ("bali-nusa", "Bali & Nusa"),
-    ("maluku", "Maluku"), ("papua", "Papua"),
+    ("all", "Semua"),
+    ("favorit", "★ Favorit"),
+    ("group:Genre", [
+        ("genre:pop", "Pop"), ("genre:rock", "Rock"), ("genre:jazz", "Jazz"), ("genre:news", "Berita/News"),
+        ("genre:religious", "Religi"), ("genre:classical", "Klasik"), ("genre:dance", "Dance/Electronic"),
+        ("genre:oldies", "Oldies"), ("genre:hiphop", "HipHop"), ("genre:chill", "Chill/LoFi"),
+        ("genre:talk", "Talk"), ("genre:sports", "Olahraga"), ("genre:other", "Lainnya"),
+    ]),
+    ("group:Indonesia", [
+        ("nasional", "Nasional"), ("jabodetabek", "Jabodetabek"), ("jawa", "Jawa"),
+        ("sumatera", "Sumatera"), ("kalimantan", "Kalimantan"), ("sulawesi", "Sulawesi"),
+        ("bali-nusa", "Bali & Nusa"), ("maluku", "Maluku"), ("papua", "Papua"),
+    ]),
+    ("internasional", "Internasional"),
 ]
 TV_FILTERS = [
     ("all", "Semua"), ("favorit", "★ Favorit"), ("nasional", "Nasional"), ("regional", "Regional"),
@@ -15,6 +24,13 @@ TV_FILTERS = [
     ("komedi", "Komedi"), ("hiburan", "Hiburan"), ("anak", "Anak"),
     ("musik", "Musik"), ("dokumenter", "Dokumenter"), ("berita", "Berita"),
 ]
+
+RADIO_CONTROLS = '''        <label class="theme-toggle" title="Filter negara radio">
+          Negara
+          <select id="radio-country" aria-label="Filter negara radio">
+            <option value="">Semua negara</option>
+          </select>
+        </label>'''
 
 TV_CONTROLS = '''        <div class="sort-group" id="sort-group" role="group" aria-label="Urutkan kanal">
           <span class="sort-label">Urut:</span>
@@ -40,7 +56,7 @@ TEMPLATE = '''<!DOCTYPE html>
   <title>{title} | TVRadioID</title>
   <meta name="description" content="{description}" />
   <meta name="theme-color" content="#0f172a" />
-  <link rel="stylesheet" href="style.css?v=31" />
+  <link rel="stylesheet" href="style.css?v=35" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
@@ -148,6 +164,11 @@ TEMPLATE = '''<!DOCTYPE html>
         <div class="video-nav">
           <button type="button" class="video-nav-btn" id="video-prev" aria-label="Kanal sebelumnya">‹ Prev Channel</button>
           <button type="button" class="video-nav-btn" id="video-next" aria-label="Kanal berikutnya">Next Channel ›</button>
+          <button type="button" class="video-nav-btn" id="video-cc" aria-label="Subtitle" aria-pressed="false">CC</button>
+          <select id="video-cc-track" class="video-cc-select" aria-label="Pilih subtitle" hidden></select>
+          <select id="video-quality" class="video-cc-select" aria-label="Pilih kualitas video" title="Kualitas video">
+            <option value="auto">Auto</option>
+          </select>
           <button class="fp-close" id="video-close" aria-label="Tutup pemutar video">✕</button>
         </div>
       </div>
@@ -193,7 +214,7 @@ TEMPLATE = '''<!DOCTYPE html>
 
   <script src="hls.min.js?v=1"></script>
   <script src="stations-data.js?v=8"></script>
-  <script src="script.js?v=35"></script>
+  <script src="script.js?v=39"></script>
 </body>
 </html>
 '''
@@ -202,8 +223,15 @@ TEMPLATE = '''<!DOCTYPE html>
 def tabs_html(items, active_value='all'):
     lines = []
     for value, label in items:
-        sel = ' selected' if value == active_value else ''
-        lines.append(f'        <option value="{value}"{sel}>{label}</option>')
+        if isinstance(label, list):
+            lines.append(f'        <optgroup label="{value.replace("group:","")}">')
+            for v,l in label:
+                sel = ' selected' if v == active_value else ''
+                lines.append(f'          <option value="{v}"{sel}>{l}</option>')
+            lines.append('        </optgroup>')
+        else:
+            sel = ' selected' if value == active_value else ''
+            lines.append(f'        <option value="{value}"{sel}>{label}</option>')
     return "\n".join(lines)
 
 
@@ -215,7 +243,7 @@ def build(page):
             self="radio.html",
             radio_active=' aria-current="page"', tv_active="",
             tabs=tabs_html(RADIO_FILTERS, 'all'),
-            tv_controls="",
+            tv_controls=RADIO_CONTROLS,
         )
     else:
         data = dict(
