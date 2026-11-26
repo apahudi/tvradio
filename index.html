@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TVRadioID | dari apahudi untuk negeri</title>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root{--bg:#0f172a;--text:#f1f5f9;--muted:#94a3b8;--accent:#22d3ee;--accent2:#818cf8}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:var(--text);background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(34,211,238,.18),transparent),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(129,140,248,.12),transparent),var(--bg);display:flex;flex-direction:column}
+    .wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem 1.25rem;text-align:center}
+    .brand{margin-bottom:.35rem;font-size:clamp(2rem,6vw,3.2rem);font-weight:800;letter-spacing:-.02em}
+    .brand span{color:var(--accent)}
+    .tagline{color:var(--muted);font-size:1rem;margin-bottom:2rem}
+    .country-box{width:100%;max-width:520px;margin-bottom:1.5rem;padding:1rem 1.1rem;border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 32px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.1);text-align:left}
+    .country-box label{display:block;font-size:.82rem;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+    .country-toggle{width:100%;padding:.75rem .9rem;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(15,23,42,.55);color:var(--text);font:inherit;font-size:.92rem;text-align:left;cursor:pointer}
+    .country-toggle:focus{outline:none;border-color:rgba(34,211,238,.5)}
+    .country-panel{margin-top:.6rem;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(15,23,42,.72);overflow:hidden}
+    .country-panel[hidden]{display:none}
+    .country-search{width:100%;padding:.65rem .8rem;border:0;border-bottom:1px solid rgba(255,255,255,.1);background:transparent;color:var(--text);font:inherit;font-size:.9rem}
+    .country-search:focus{outline:none}
+    .country-actions{display:flex;gap:.5rem;padding:.5rem .7rem;border-bottom:1px solid rgba(255,255,255,.08)}
+    .country-actions button{background:none;border:0;color:var(--accent);font:inherit;font-size:.78rem;cursor:pointer;padding:.2rem 0}
+    .country-list{max-height:220px;overflow:auto;padding:.35rem .5rem}
+    .country-item{display:flex;align-items:center;gap:.55rem;padding:.35rem .3rem;font-size:.88rem;cursor:pointer;border-radius:8px}
+    .country-item:hover{background:rgba(255,255,255,.05)}
+    .country-item input{accent-color:var(--accent)}
+    .choices{display:grid;grid-template-columns:repeat(2,minmax(140px,220px));gap:1.25rem;width:100%;max-width:480px}
+    .choice{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;padding:2.2rem 1.5rem;border-radius:24px;text-decoration:none;color:var(--text);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 32px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.12);transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;cursor:pointer}
+    .choice:hover,.choice:focus-visible{transform:translateY(-4px);border-color:rgba(34,211,238,.45);box-shadow:0 12px 40px rgba(34,211,238,.18), inset 0 1px 0 rgba(255,255,255,.18);outline:none}
+    .choice .icon{width:72px;height:72px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2.2rem;background:linear-gradient(135deg,rgba(34,211,238,.22),rgba(129,140,248,.18));border:1px solid rgba(255,255,255,.1)}
+    .choice .label{font-size:1.35rem;font-weight:700}
+    .choice .sub{font-size:.82rem;color:var(--muted)}
+    footer{padding:1.25rem;text-align:center;color:var(--muted);font-size:.8rem}
+    @media (max-width:420px){.choices{grid-template-columns:1fr;max-width:280px}.choice{padding:1.8rem 1.25rem}}
+
+    body[data-theme="win11"]{--bg:#f3f3f3;--text:#1a1a1a;--muted:#5c5c5c;--accent:#0078d4;--accent2:#005a9e}
+    body[data-theme="mac"]{--bg:#f5f5f7;--text:#1d1d1f;--muted:#6e6e73;--accent:#007aff;--accent2:#5856d6}
+    body[data-theme="ubuntu"]{--bg:#2c2c2c;--text:#f7f7f7;--muted:#b0b0b0;--accent:#e95420;--accent2:#77216f}
+    body[data-theme="minimalis"]{--bg:#ffffff;--text:#111;--muted:#666;--accent:#111;--accent2:#444}
+    body[data-theme="win11"],body[data-theme="mac"],body[data-theme="minimalis"]{background:var(--bg)}
+    body[data-theme="win11"] .choice,body[data-theme="mac"] .choice,body[data-theme="minimalis"] .choice,body[data-theme="win11"] .country-box,body[data-theme="mac"] .country-box,body[data-theme="minimalis"] .country-box{background:rgba(255,255,255,.85);color:var(--text);border-color:rgba(0,0,0,.1)}
+    body[data-theme="win11"] .country-toggle,body[data-theme="win11"] #theme-select,body[data-theme="win11"] .country-search,body[data-theme="win11"] .country-panel,
+    body[data-theme="mac"] .country-toggle,body[data-theme="mac"] #theme-select,body[data-theme="mac"] .country-search,body[data-theme="mac"] .country-panel,
+    body[data-theme="minimalis"] .country-toggle,body[data-theme="minimalis"] #theme-select,body[data-theme="minimalis"] .country-search,body[data-theme="minimalis"] .country-panel{background:#fff;color:var(--text);border-color:rgba(0,0,0,.12)}
+    body[data-theme="ubuntu"] .choice,body[data-theme="ubuntu"] .country-box{background:rgba(59,59,59,.8);border-color:rgba(255,255,255,.12)}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">TV<span>Radio</span>ID</div>
+    <p class="tagline">dari apahudi untuk negeri</p>
+    <div class="country-box">
+      <label for="theme-select">Tema UI</label>
+      <select id="theme-select" style="width:100%;padding:.65rem .8rem;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:rgba(15,23,42,.55);color:var(--text);font:inherit;font-size:.92rem;margin-bottom:.8rem">
+        <option value="dark">Default Gelap</option>
+        <option value="win11">Windows 11</option>
+        <option value="mac">Mac OS Tahoe</option>
+        <option value="ubuntu">Ubuntu 26</option>
+        <option value="minimalis">Minimalis</option>
+      </select>
+      <label for="country-toggle">Pilih negara kanal TV / Radio (bisa lebih dari satu)</label>
+      <button type="button" class="country-toggle" id="country-toggle" aria-expanded="false">Semua Negara</button>
+      <div class="country-panel" id="country-panel" hidden>
+        <input type="search" class="country-search" id="country-search" placeholder="Cari negara…" aria-label="Cari negara" />
+        <div class="country-actions">
+          <button type="button" id="country-all">Pilih semua tampil</button>
+          <button type="button" id="country-none">Hapus semua</button>
+        </div>
+        <div class="country-list" id="country-list"></div>
+      </div>
+    </div>
+    <div class="choices" role="navigation" aria-label="Pilih mode">
+      <a class="choice" id="go-tv" href="tv.html">
+        <div class="icon" aria-hidden="true">📺</div>
+        <div class="label">TV</div>
+        <div class="sub">Tonton channel TV</div>
+      </a>
+      <a class="choice" id="go-radio" href="radio.html">
+        <div class="icon" aria-hidden="true">📻</div>
+        <div class="label">RADIO</div>
+        <div class="sub">Dengarkan radio</div>
+      </a>
+    </div>
+  </main>
+  <footer>RadioTV v.1.0 | dibuat oleh ApahUdi | 2026</footer>
+  <script src="stations-data.js?v=8"></script>
+  <script>
+  (() => {
+
+    const themeSelect = document.getElementById('theme-select');
+    function applyTheme(t,save){ t=['dark','win11','mac','ubuntu','minimalis'].includes(t)?t:'dark'; document.body.dataset.theme=t; if(themeSelect) themeSelect.value=t; if(save) try{localStorage.setItem('tvradio_theme',t)}catch{} }
+    applyTheme(localStorage.getItem('tvradio_theme')||'dark',false);
+    if(themeSelect) themeSelect.addEventListener('change',()=>applyTheme(themeSelect.value,true));
+
+    const toggle = document.getElementById('country-toggle');
+    const panel = document.getElementById('country-panel');
+    const search = document.getElementById('country-search');
+    const list = document.getElementById('country-list');
+    const btnAll = document.getElementById('country-all');
+    const btnNone = document.getElementById('country-none');
+    const tv = document.getElementById('go-tv');
+    const radio = document.getElementById('go-radio');
+    const data = Array.isArray(window.STATIONS_DATA) ? window.STATIONS_DATA : [];
+    const names = new Intl.DisplayNames(['id'], { type: 'region' });
+    const counts = new Map();
+    data.forEach(s => { const c = String(s.country||'').toUpperCase(); if (/^[A-Z]{2}$/.test(c)) counts.set(c, (counts.get(c)||0)+1); });
+    const entries = Array.from(counts.entries()).map(([code,n]) => {
+      let name = code; try { name = names.of(code) || code; } catch {}
+      return {code, name, n};
+    }).sort((a,b)=>a.name.localeCompare(b.name,'id'));
+    let selected = [];
+    try { selected = (localStorage.getItem('tvradio_country') || '').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean); } catch {}
+
+    function renderList() {
+      const q = (search.value || '').toLowerCase().trim();
+      list.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      entries.filter(e => !q || e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q)).forEach(e => {
+        const lab = document.createElement('label');
+        lab.className = 'country-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = e.code; cb.checked = selected.includes(e.code);
+        cb.addEventListener('change', () => {
+          if (cb.checked) { if (!selected.includes(e.code)) selected.push(e.code); }
+          else selected = selected.filter(x => x !== e.code);
+          updateLinks();
+        });
+        const span = document.createElement('span');
+        span.textContent = `${e.name} (${e.n})`;
+        lab.append(cb, span);
+        frag.appendChild(lab);
+      });
+      list.appendChild(frag);
+    }
+    function updateLinks() {
+      const val = selected.join(',');
+      toggle.textContent = selected.length ? `${selected.length} negara dipilih` : 'Semua Negara';
+      const q = selected.length ? `?country=${encodeURIComponent(val)}` : '';
+      tv.href = 'tv.html' + q;
+      radio.href = 'radio.html' + q;
+      try { localStorage.setItem('tvradio_country', val); } catch {}
+    }
+    toggle.addEventListener('click', () => {
+      const open = panel.hidden;
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) { search.focus(); renderList(); }
+    });
+    document.addEventListener('click', (e) => {
+      if (!panel.hidden && !e.target.closest('.country-box')) { panel.hidden = true; toggle.setAttribute('aria-expanded','false'); }
+    });
+    search.addEventListener('input', renderList);
+    btnAll.addEventListener('click', () => {
+      const q = (search.value || '').toLowerCase().trim();
+      entries.filter(e => !q || e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q)).forEach(e => { if (!selected.includes(e.code)) selected.push(e.code); });
+      renderList(); updateLinks();
+    });
+    btnNone.addEventListener('click', () => { selected = []; renderList(); updateLinks(); });
+    renderList();
+    updateLinks();
+  })();
+  </script>
+</body>
+</html>
